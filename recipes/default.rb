@@ -22,28 +22,29 @@ include_recipe "build-essential"
 include_recipe "mysql::client"      if node[:sphinx][:use_mysql]
 include_recipe "postgresql::client" if node[:sphinx][:use_postgres]
 
+# TODO: add it to not_if block
+# `/usr/local/bin/searchd -h|head -n1|awk '{print $2}'` == node[:sphinx][:version]}
 remote_file "/tmp/sphinx-#{node[:sphinx][:version]}.tar.gz" do
   source "#{node[:sphinx][:url]}"
   checksum node[:sphinx][:checksum]
-  not_if { ::File.exist?('/usr/local/bin/searchd') &&
-    `/usr/local/bin/searchd -h|head -n1|awk '{print $2}'` == node[:sphinx][:version]}
+  not_if { ::File.exist?('/usr/local/bin/searchd') }
+
 end
 
 execute "Extract Sphinx source" do
   cwd "/tmp"
   command "tar -zxvf /tmp/sphinx-#{node[:sphinx][:version]}.tar.gz"
-  not_if { ::File.exist?('/usr/local/bin/searchd') &&
-    `/usr/local/bin/searchd -h|head -n1|awk '{print $2}'` == node[:sphinx][:version]}
+  not_if { ::File.exist?('/usr/local/bin/searchd') }
 end
 
 bash "Build and Install Sphinx Search" do
   cwd "/tmp/sphinx-#{node[:sphinx][:version]}"
   code <<-EOH
-    ./configure #{node[:sphinx][:configure_flags].join(" ")}
-    make
-    make install
+    ./configure #{node[:sphinx][:configure_flags].join(" ")} && \
+    make -j#{node[:cpu][:total]} && \
+    make -j#{node[:cpu][:total]} install && \
+    cd / && rm -rf /tmp/sphinx-#{node[:sphinx][:version]} /tmp/sphinx-#{node[:sphinx][:version]}.tar.gz
   EOH
-  not_if { ::File.exist?('/usr/local/bin/searchd') &&
-    `/usr/local/bin/searchd -h|head -n1|awk '{print $2}'` == node[:sphinx][:version]}
+  not_if { ::File.exist?('/usr/local/bin/searchd') }
 end
 
